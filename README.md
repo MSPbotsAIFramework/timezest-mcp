@@ -42,6 +42,8 @@ tools return `{items, count, has_more, next_cursor}` and take `startingAfter` (t
 | Tool | Purpose | Parameters (required in **bold**) |
 |---|---|---|
 | `timezest_status` | Check the connection (the API key works) and list the tool groups | - |
+| `timezest_navigate` | Describe one tool group and its tool names (local, no API call; kept for compatibility) | **domain** (`agents`, `teams`, `appointment_types`, `resources`, `scheduling`) |
+| `timezest_back` | Says all tools are always available (local, no API call; kept for compatibility) | - |
 | `timezest_agents_list` | List agents (technicians): name, email, role, whether schedulable | pageSize, filter, startingAfter |
 | `timezest_agents_get` | One agent | **agentId** |
 | `timezest_teams_list` | List teams (pools of agents) and their type | pageSize, filter, startingAfter |
@@ -51,7 +53,7 @@ tools return `{items, count, has_more, next_cursor}` and take `startingAfter` (t
 | `timezest_resources_list` | List bookable resources (agents and teams); their ids go into `resourceIds` | pageSize, type (`agent`, `team`), filter, startingAfter |
 | `timezest_scheduling_list` | List scheduling requests: end user, type, status, chosen time, URL | pageSize, status (`new`, `sent`, `scheduled`, `cancelled`, `closed`; also `pending`, `booked`, `completed`), filter, startingAfter |
 | `timezest_scheduling_get` | One scheduling request with resources, booked agents and booking URL | **requestId** |
-| `timezest_scheduling_create_request` | Create a scheduling request; TimeZest emails the customer (**write**) | **appointmentTypeId**, **triggerMode** (`pod`, `generate_url`), **endUser** {**name**, email, company}, timeRange {earliestDate, earliestTime, latestDate, latestTime}, resourceIds, associatedEntities [{**type**, id, number}], durationMins, guests |
+| `timezest_scheduling_create_request` | Create a scheduling request; TimeZest emails the customer (**write**) | appointmentTypeId (needed at runtime), **triggerMode** (`pod`, `generate_url`), **endUser** {**name**, email, company}, timeRange {earliestDate, earliestTime, latestDate, latestTime}, resourceIds, associatedEntities [{**type**, id, number}], durationMins, guests, notes (ignored) |
 | `timezest_scheduling_cancel` | Explain how to cancel a request (the API cannot cancel); returns its status and URL | **requestId**, reason |
 
 `associatedEntities[].type` is one of `autotask/company`, `autotask/contact`, `autotask/ticket`,
@@ -115,15 +117,23 @@ uv run pytest
 
 ## Delivery notes
 
-- **Tool count (12).** Kept as is because the tool names are an existing contract.
+- **Tool count (14).** Kept as is because the tool names are an existing contract.
+  `timezest_navigate` and `timezest_back` come from earlier versions, where tools had to be
+  unlocked per domain; they are purely local (no TimeZest call, `openWorldHint` false) and only
+  describe the tool groups, since every tool is always listed.
 - **Cancelling.** The TimeZest API has no cancel operation, so `timezest_scheduling_cancel`
   changes nothing: it returns the request's status and `scheduling_url` (the customer's
   reschedule / cancel page) and tells the agent to have it cancelled in TimeZest or the PSA.
-- **Create request.** `appointmentTypeId` is required (TimeZest requires it; older versions
-  silently picked the first type). `resource_ids` is always sent as an array. Associated
-  entities use TimeZest's own type names (for example `connectwise_psa/service_ticket`), times
-  are sent as `HH:MM:SS`, and fields TimeZest does not accept (`notes`, end-user `phone`, time
-  zone) were removed instead of being silently dropped.
+- **Create request.** TimeZest needs `appointmentTypeId` (older versions silently picked the
+  first type). It is optional in the schema for compatibility with earlier versions; a call
+  without it returns `invalid_argument` listing the available appointment types (id and name)
+  instead of guessing. `resource_ids` is always sent as an array. Associated entities use
+  TimeZest's own type names (for example `connectwise_psa/service_ticket`) and times are sent as
+  `HH:MM:SS`. `notes` is accepted for compatibility but not sent (the TimeZest API does not
+  accept it; the result says `notes_ignored`); end-user `phone` and time zone are not sent either.
+- **Contract test.** `tests/contract_baseline.json` holds the deployed and upstream tool schemas;
+  `tests/test_contract.py` checks every tool still exists, accepts every parameter of both and
+  requires nothing the deployed version did not.
 - **Lookups by id.** TimeZest has no get-by-id for agents, teams or appointment types, so the
   `_get` tools walk the list pages (at most 50 pages) to find the id.
 - **No interactive prompts.** Older versions asked the user to pick an appointment type or

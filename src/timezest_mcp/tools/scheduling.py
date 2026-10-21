@@ -20,7 +20,19 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
 from ..api_client import TimeZestClient
-from ._common import READ_ONLY, WRITES, ClientFactory, Cursor, PageSize, Tql, compact, list_page, readable, run_tool
+from ._common import (
+    READ_ONLY,
+    WRITES,
+    ClientFactory,
+    Cursor,
+    PageSize,
+    Tql,
+    compact,
+    list_page,
+    readable,
+    rows,
+    run_tool,
+)
 
 STATUSES = ("new", "sent", "scheduled", "cancelled", "closed")
 # Older names some callers still use.
@@ -170,12 +182,15 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
 
     @mcp.tool(annotations=WRITES)
     async def timezest_scheduling_create_request(
-        appointmentTypeId: Annotated[str, Field(description="Appointment type id (apty_...).", min_length=1)],
         triggerMode: Annotated[
             Literal["pod", "generate_url"],
             Field(description="pod runs the normal scheduling workflow (emails the end user); generate_url runs the Generate URL workflow."),
         ],
         endUser: Annotated[EndUser, Field(description="The customer who picks the time.")],
+        appointmentTypeId: Annotated[
+            str | None,
+            Field(description="Appointment type id (apty_...), needed. Without it the error lists the available types."),
+        ] = None,
         timeRange: Annotated[TimeRange | None, Field(description="Window the customer may pick from.")] = None,
         resourceIds: Annotated[list[str] | None, Field(description="Agent / team ids to book (from timezest_resources_list).")] = None,
         associatedEntities: Annotated[
@@ -183,19 +198,35 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
         ] = None,
         durationMins: Annotated[int | None, Field(description="Override the appointment type's duration.", ge=5, le=1440)] = None,
         guests: Annotated[list[str] | None, Field(description="Extra guest email addresses.")] = None,
+        notes: Annotated[
+            str | None, Field(description="Accepted for compatibility and ignored: the TimeZest API does not take notes.")
+        ] = None,
     ) -> str:
         """Create a scheduling request; TimeZest emails the customer and can update the PSA ticket.
 
-        Only when the user explicitly asks.
+        Only when the user explicitly asks. appointmentTypeId is needed (see
+        timezest_appointment_types_list). notes is ignored: the TimeZest API does not accept it.
         """
 
         async def action(client: TimeZestClient) -> Any:
+            if not appointmentTypeId or not appointmentTypeId.strip():
+                types = rows(await client.get("appointment_types"))
+                listed = ", ".join(
+                    f"{t.get('id')} ({t.get('name')})" for t in types if isinstance(t, dict) and t.get("id")
+                )
+                raise ValueError(
+                    "appointmentTypeId is needed to create a scheduling request. "
+                    + (f"Available appointment types: {listed}." if listed else "No appointment types are visible.")
+                    + " Ask the user which one to use (timezest_appointment_types_list shows more)."
+                )
             body = build_request_body(
                 appointmentTypeId, triggerMode, endUser, timeRange, resourceIds, associatedEntities, durationMins, guests
             )
             created = readable(await client.post("scheduling_requests", body))
             if isinstance(created, dict) and created.get("scheduling_url"):
                 created["note"] = "Share scheduling_url with the customer if TimeZest does not email it."
+            if notes and notes.strip() and isinstance(created, dict):
+                created["notes_ignored"] = "TimeZest does not accept notes; they were not sent."
             return created
 
         return await run_tool("timezest_scheduling_create_request", client_factory, action)

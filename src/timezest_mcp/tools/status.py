@@ -11,12 +11,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Connection check and tool overview."""
+"""Connection check, tool overview and the (local) domain navigation tools of earlier versions."""
+
+from typing import Annotated, Literal
 
 from mcp.server.fastmcp import FastMCP
+from pydantic import Field
 
+from .._json import dump_json_capped
 from ..api_client import TimeZestClient
-from ._common import READ_ONLY, ClientFactory, rows, run_tool
+from ._common import LOCAL, READ_ONLY, ClientFactory, rows, run_tool
 
 TOOL_GROUPS = {
     "agents": ("Technicians who can be booked.", ["timezest_agents_list", "timezest_agents_get"]),
@@ -36,6 +40,10 @@ TOOL_GROUPS = {
         ],
     ),
 }
+# Kept for callers of earlier versions, which had to "enter" a domain first. Every tool is
+# always available now, so these only describe the tools; they never call TimeZest.
+NAVIGATION_TOOLS = ["timezest_status", "timezest_navigate", "timezest_back"]
+Domain = Literal["agents", "teams", "appointment_types", "resources", "scheduling"]
 
 
 def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
@@ -49,6 +57,35 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
                 "connected": True,
                 "appointment_types_visible": len(types),
                 "tool_groups": {name: {"summary": s, "tools": t} for name, (s, t) in TOOL_GROUPS.items()},
+                "navigation_tools": NAVIGATION_TOOLS,
             }
 
         return await run_tool("timezest_status", client_factory, action)
+
+    @mcp.tool(annotations=LOCAL)
+    async def timezest_navigate(
+        domain: Annotated[Domain, Field(description="Tool group to describe.")],
+    ) -> str:
+        """Describe one tool group (domain) and its tool names. No API call.
+
+        Kept for compatibility: every tool is always available, so navigating is optional.
+        """
+        summary, tools = TOOL_GROUPS[domain]
+        return dump_json_capped(
+            {
+                "domain": domain,
+                "summary": summary,
+                "tools": tools,
+                "note": "All TimeZest tools are always available; call these tools directly.",
+            }
+        )
+
+    @mcp.tool(annotations=LOCAL)
+    async def timezest_back() -> str:
+        """Leave a tool group (domain). No API call; kept for compatibility, all tools stay available."""
+        return dump_json_capped(
+            {
+                "message": "There is nothing to go back from: all TimeZest tools are always available.",
+                "domains": list(TOOL_GROUPS),
+            }
+        )

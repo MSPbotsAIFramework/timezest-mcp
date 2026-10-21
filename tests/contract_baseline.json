@@ -1,0 +1,212 @@
+{
+  "int_baseline": {
+    "timezest_agents_get": {
+      "params": [
+        "agentId"
+      ],
+      "required": [
+        "agentId"
+      ]
+    },
+    "timezest_agents_list": {
+      "params": [
+        "pageSize",
+        "filter"
+      ],
+      "required": []
+    },
+    "timezest_appointment_types_get": {
+      "params": [
+        "appointmentTypeId"
+      ],
+      "required": [
+        "appointmentTypeId"
+      ]
+    },
+    "timezest_appointment_types_list": {
+      "params": [
+        "pageSize",
+        "filter"
+      ],
+      "required": []
+    },
+    "timezest_back": {
+      "params": [],
+      "required": []
+    },
+    "timezest_navigate": {
+      "params": [
+        "domain"
+      ],
+      "required": [
+        "domain"
+      ]
+    },
+    "timezest_resources_list": {
+      "params": [
+        "pageSize",
+        "type",
+        "filter"
+      ],
+      "required": []
+    },
+    "timezest_scheduling_cancel": {
+      "params": [
+        "requestId",
+        "reason"
+      ],
+      "required": [
+        "requestId"
+      ]
+    },
+    "timezest_scheduling_create_request": {
+      "params": [
+        "appointmentTypeId",
+        "triggerMode",
+        "endUser",
+        "timeRange",
+        "resourceIds",
+        "notes",
+        "associatedEntities"
+      ],
+      "required": [
+        "triggerMode",
+        "endUser"
+      ]
+    },
+    "timezest_scheduling_get": {
+      "params": [
+        "requestId"
+      ],
+      "required": [
+        "requestId"
+      ]
+    },
+    "timezest_scheduling_list": {
+      "params": [
+        "pageSize",
+        "status",
+        "filter"
+      ],
+      "required": []
+    },
+    "timezest_status": {
+      "params": [],
+      "required": []
+    },
+    "timezest_teams_get": {
+      "params": [
+        "teamId"
+      ],
+      "required": [
+        "teamId"
+      ]
+    },
+    "timezest_teams_list": {
+      "params": [
+        "pageSize",
+        "filter"
+      ],
+      "required": []
+    }
+  },
+  "upstream": {
+    "timezest_agents_get": {
+      "params": [
+        "agentId"
+      ],
+      "required": [
+        "agentId"
+      ]
+    },
+    "timezest_agents_list": {
+      "params": [
+        "pageSize",
+        "filter"
+      ],
+      "required": []
+    },
+    "timezest_appointment_types_get": {
+      "params": [
+        "appointmentTypeId"
+      ],
+      "required": [
+        "appointmentTypeId"
+      ]
+    },
+    "timezest_appointment_types_list": {
+      "params": [
+        "pageSize",
+        "filter"
+      ],
+      "required": []
+    },
+    "timezest_resources_list": {
+      "params": [
+        "pageSize",
+        "type",
+        "filter"
+      ],
+      "required": []
+    },
+    "timezest_scheduling_cancel": {
+      "params": [
+        "requestId",
+        "reason"
+      ],
+      "required": [
+        "requestId"
+      ]
+    },
+    "timezest_scheduling_create_request": {
+      "params": [
+        "appointmentTypeId",
+        "triggerMode",
+        "endUser",
+        "timeRange",
+        "resourceIds",
+        "notes",
+        "associatedEntities"
+      ],
+      "required": [
+        "triggerMode",
+        "endUser"
+      ]
+    },
+    "timezest_scheduling_get": {
+      "params": [
+        "requestId"
+      ],
+      "required": [
+        "requestId"
+      ]
+    },
+    "timezest_scheduling_list": {
+      "params": [
+        "pageSize",
+        "status",
+        "filter"
+      ],
+      "required": []
+    },
+    "timezest_status": {
+      "params": [],
+      "required": []
+    },
+    "timezest_teams_get": {
+      "params": [
+        "teamId"
+      ],
+      "required": [
+        "teamId"
+      ]
+    },
+    "timezest_teams_list": {
+      "params": [
+        "pageSize",
+        "filter"
+      ],
+      "required": []
+    }
+  }
+}

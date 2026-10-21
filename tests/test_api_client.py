@@ -17,6 +17,7 @@ import json
 
 import httpx
 import pytest
+from mcp.server.fastmcp.exceptions import ToolError
 
 from timezest_mcp import api_client
 from timezest_mcp.api_client import TimeZestClient, TimeZestCredentials, TimeZestError
@@ -239,6 +240,48 @@ async def test_create_rejects_bad_values_before_calling(monkeypatch, extra):
     result = await _call(monkeypatch, rec, "timezest_scheduling_create_request", args)
     assert result["error"]["code"] == "invalid_argument"
     assert rec.requests == []
+
+
+async def test_create_without_appointment_type_lists_the_types(monkeypatch):
+    types = page([{"id": "apty_1", "name": "Remote session"}, {"id": "apty_2", "name": "Onsite visit"}])
+    rec = Recorder({"appointment_types": types})
+    args = {"triggerMode": "pod", "endUser": {"name": "A"}}
+    result = await _call(monkeypatch, rec, "timezest_scheduling_create_request", args)
+    assert result["error"]["code"] == "invalid_argument"
+    message = result["error"]["message"]
+    assert "appointmentTypeId" in message
+    assert "apty_1 (Remote session)" in message and "apty_2 (Onsite visit)" in message
+    assert [r.method for r in rec.requests] == ["GET"]
+
+
+async def test_create_accepts_and_ignores_notes(monkeypatch):
+    rec = Recorder({"POST scheduling_requests": {"id": "sreq_9"}})
+    args = {"appointmentTypeId": "apty_1", "triggerMode": "pod", "endUser": {"name": "A"}, "notes": "Bring the laptop"}
+    result = await _call(monkeypatch, rec, "timezest_scheduling_create_request", args)
+    assert "notes" not in body(rec.requests[0]) and "Bring the laptop" not in rec.requests[0].content.decode()
+    assert result["id"] == "sreq_9" and "notes_ignored" in result
+
+
+async def _call_local(tool: str, args: dict):
+    content, _ = await create_mcp_server().call_tool(tool, args)
+    return json.loads(content[0].text)
+
+
+async def test_navigate_is_local_and_lists_domain_tools():
+    result = await _call_local("timezest_navigate", {"domain": "scheduling"})
+    assert result["domain"] == "scheduling"
+    assert "timezest_scheduling_create_request" in result["tools"]
+    assert result["summary"]
+
+
+async def test_navigate_rejects_unknown_domain():
+    with pytest.raises(ToolError):
+        await _call_local("timezest_navigate", {"domain": "billing"})
+
+
+async def test_back_says_all_tools_are_available():
+    result = await _call_local("timezest_back", {})
+    assert "always available" in result["message"]
 
 
 async def test_cancel_changes_nothing_and_points_to_the_url(monkeypatch):

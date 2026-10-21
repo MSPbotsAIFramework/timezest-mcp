@@ -25,6 +25,8 @@ from timezest_mcp.server import INSTRUCTIONS, create_mcp_server
 # depend on them. Changing this snapshot is a breaking change.
 EXPECTED_TOOLS: dict[str, set[str]] = {
     "timezest_status": set(),
+    "timezest_navigate": {"domain"},
+    "timezest_back": set(),
     "timezest_agents_list": set(),
     "timezest_agents_get": {"agentId"},
     "timezest_teams_list": set(),
@@ -34,7 +36,8 @@ EXPECTED_TOOLS: dict[str, set[str]] = {
     "timezest_resources_list": set(),
     "timezest_scheduling_list": set(),
     "timezest_scheduling_get": {"requestId"},
-    "timezest_scheduling_create_request": {"appointmentTypeId", "triggerMode", "endUser"},
+    # appointmentTypeId is checked at runtime (earlier versions did not require it).
+    "timezest_scheduling_create_request": {"triggerMode", "endUser"},
     "timezest_scheduling_cancel": {"requestId"},
 }
 WRITE_TOOLS = {"timezest_scheduling_create_request"}
@@ -68,6 +71,20 @@ def test_annotations_match_side_effects(tools, name):
     assert annotations is not None
     assert annotations.readOnlyHint is (name not in WRITE_TOOLS)
     assert not annotations.destructiveHint
+
+
+@pytest.mark.parametrize("name", ["timezest_navigate", "timezest_back"])
+def test_navigation_tools_are_local(tools, name):
+    annotations = tools[name].annotations
+    assert annotations.readOnlyHint is True and annotations.openWorldHint is False
+
+
+def test_navigate_domains_match_tool_groups(tools):
+    from timezest_mcp.tools.status import NAVIGATION_TOOLS, TOOL_GROUPS
+
+    assert set(tools["timezest_navigate"].inputSchema["properties"]["domain"]["enum"]) == set(TOOL_GROUPS)
+    listed = {t for _, group in TOOL_GROUPS.values() for t in group} | set(NAVIGATION_TOOLS)
+    assert listed == set(tools)
 
 
 def test_create_says_when_to_use_it(tools):
