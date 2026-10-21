@@ -290,3 +290,38 @@ async def test_cancel_changes_nothing_and_points_to_the_url(monkeypatch):
     assert result["cancelled"] is False
     assert result["scheduling_url"] == "https://example.timezest.com/schedule/x"
     assert [r.method for r in rec.requests] == ["GET"]
+
+
+# ---- compatibility: object or JSON-text arguments -------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "end_user,time_range",
+    [
+        ({"name": "Rodney Smith", "email": "rodney@example.com"}, {"earliestDate": "2026-06-01", "latestTime": "16:30"}),
+        ('{"name": "Rodney Smith", "email": "rodney@example.com"}', '{"earliestDate": "2026-06-01", "latestTime": "16:30"}'),
+    ],
+)
+async def test_create_accepts_objects_or_json_text(monkeypatch, end_user, time_range):
+    rec = Recorder({"POST scheduling_requests": {"id": "sreq_9"}})
+    args = {"appointmentTypeId": "apty_1", "triggerMode": "pod", "endUser": end_user, "timeRange": time_range}
+    await _call(monkeypatch, rec, "timezest_scheduling_create_request", args)
+    sent = body(rec.requests[0])
+    assert sent["end_user_name"] == "Rodney Smith" and sent["end_user_email"] == "rodney@example.com"
+    assert sent["earliest_date"] == "2026-06-01" and sent["latest_time"] == "16:30:00"
+
+
+async def test_create_accepts_plain_end_user_name(monkeypatch):
+    rec = Recorder({"POST scheduling_requests": {"id": "sreq_9"}})
+    args = {"appointmentTypeId": "apty_1", "triggerMode": "pod", "endUser": " Rodney Smith "}
+    await _call(monkeypatch, rec, "timezest_scheduling_create_request", args)
+    assert body(rec.requests[0])["end_user_name"] == "Rodney Smith"
+
+
+@pytest.mark.parametrize("extra", [{"timeRange": "next week"}, {"timeRange": "{not json"}])
+async def test_create_rejects_unreadable_text_before_calling(monkeypatch, extra):
+    rec = Recorder()
+    args = {"appointmentTypeId": "apty_1", "triggerMode": "pod", "endUser": {"name": "A"}} | extra
+    result = await _call(monkeypatch, rec, "timezest_scheduling_create_request", args)
+    assert result["error"]["code"] == "invalid_argument"
+    assert rec.requests == []

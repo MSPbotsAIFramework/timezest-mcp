@@ -13,14 +13,15 @@
 # limitations under the License.
 """Shared argument types, list / lookup helpers and the error-handling wrapper."""
 
+import json
 import logging
 import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, TypeVar
 
 from mcp.types import ToolAnnotations
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from .._json import dump_json_capped, error_envelope
 from ..api_client import TimeZestClient, TimeZestError
@@ -46,6 +47,32 @@ Tql = Annotated[str | None, Field(description='TimeZest TQL filter, e.g. "agent.
 Cursor = Annotated[str | None, Field(description="next_cursor from the previous page.")]
 
 _TIMESTAMP_FIELDS = {"created_at", "updated_at", "scheduled_at", "selected_start_time"}
+
+
+ModelT = TypeVar("ModelT", bound=BaseModel)
+
+
+def as_model(value: Any, model: type[ModelT], name: str, plain_field: str | None = None) -> ModelT | None:
+    """Accept an object, its JSON text, or (with ``plain_field``) a bare string for that one field.
+
+    Older callers sent some arguments as JSON text; this keeps both forms working.
+    """
+    if value is None or isinstance(value, model):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        if text.startswith("{"):
+            try:
+                value = json.loads(text)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"{name} is not valid JSON: {e.msg}.") from None
+        elif plain_field:
+            value = {plain_field: text}
+        else:
+            raise ValueError(f"{name} must be an object or its JSON text.")
+    return model.model_validate(value)
 
 
 def compact(values: dict[str, Any]) -> dict[str, Any]:

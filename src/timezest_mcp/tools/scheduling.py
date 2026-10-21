@@ -27,6 +27,7 @@ from ._common import (
     Cursor,
     PageSize,
     Tql,
+    as_model,
     compact,
     list_page,
     readable,
@@ -186,12 +187,18 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
             Literal["pod", "generate_url"],
             Field(description="pod runs the normal scheduling workflow (emails the end user); generate_url runs the Generate URL workflow."),
         ],
-        endUser: Annotated[EndUser, Field(description="The customer who picks the time.")],
+        endUser: Annotated[
+            EndUser | str,
+            Field(description="The customer who picks the time. Also accepted: its JSON text, or just the customer name."),
+        ],
         appointmentTypeId: Annotated[
             str | None,
             Field(description="Appointment type id (apty_...), needed. Without it the error lists the available types."),
         ] = None,
-        timeRange: Annotated[TimeRange | None, Field(description="Window the customer may pick from.")] = None,
+        timeRange: Annotated[
+            TimeRange | str | None,
+            Field(description="Window the customer may pick from. Also accepted: the same object as JSON text."),
+        ] = None,
         resourceIds: Annotated[list[str] | None, Field(description="Agent / team ids to book (from timezest_resources_list).")] = None,
         associatedEntities: Annotated[
             list[AssociatedEntity] | None, Field(description="PSA records to link, e.g. the service ticket.")
@@ -219,8 +226,12 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
                     + (f"Available appointment types: {listed}." if listed else "No appointment types are visible.")
                     + " Ask the user which one to use (timezest_appointment_types_list shows more)."
                 )
+            user = as_model(endUser, EndUser, "endUser", plain_field="name")
+            if user is None:
+                raise ValueError("endUser is needed: at least the customer name.")
+            window = as_model(timeRange, TimeRange, "timeRange")
             body = build_request_body(
-                appointmentTypeId, triggerMode, endUser, timeRange, resourceIds, associatedEntities, durationMins, guests
+                appointmentTypeId, triggerMode, user, window, resourceIds, associatedEntities, durationMins, guests
             )
             created = readable(await client.post("scheduling_requests", body))
             if isinstance(created, dict) and created.get("scheduling_url"):
