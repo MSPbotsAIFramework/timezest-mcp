@@ -17,7 +17,6 @@ import json
 
 import httpx
 import pytest
-from mcp.server.fastmcp.exceptions import ToolError
 
 from timezest_mcp import api_client
 from timezest_mcp.api_client import TimeZestClient, TimeZestCredentials, TimeZestError
@@ -275,8 +274,8 @@ async def test_navigate_is_local_and_lists_domain_tools():
 
 
 async def test_navigate_rejects_unknown_domain():
-    with pytest.raises(ToolError):
-        await _call_local("timezest_navigate", {"domain": "billing"})
+    out = await _call_local("timezest_navigate", {"domain": "billing"})
+    assert out["error"]["code"] == "invalid_argument" and "domain" in out["error"]["message"]
 
 
 async def test_back_says_all_tools_are_available():
